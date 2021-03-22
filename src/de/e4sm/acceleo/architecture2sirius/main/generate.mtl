@@ -1,0 +1,340 @@
+[comment encoding = UTF-8 /]
+[module generate('http://e4sm-projekt.de/ecore/ar')]
+
+[query public asClassName(arg : String) : String = arg.replaceAll('[\\s-]', '').toUpperFirst() /]
+[query public asSafeString(arg : String) : String = arg.replaceAll('[\\s#\\\\{}<>\\|`^/\"]', '_').toLower() /]
+[query public getBaseFolder(arg : String) : String = arg.asSafeString()+'.design/' /]
+[query public shouldMultiplicityBeChecked(anArchitecture : Architecture) : Boolean = anArchitecture.modelelements->filter(architecture::Item).outgoing->select(c : architecture::Connection | c.max > -1)->size()>0 or anArchitecture.modelelements->filter(architecture::Item).incoming->select(c : architecture::Connection | c.max > -1)->size()>0/]
+[comment]To disable printing out the debug messages to the console, return '//', otherwise return an empty string ''[/comment]
+[query public isDebugEnabled(traceabilityContext : OclAny) : String = ''/]
+
+[template public generateArchitecture(anArchitecture : Architecture)]
+[comment @main /]
+[comment]Create the empty odesign file[/comment]
+[file (anArchitecture.name.getBaseFolder()+'description/'+anArchitecture.name.asSafeString()+'.odesign', false, 'UTF-8')]
+<?xml version="1.0" encoding="UTF-8"?>
+<description:Group xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:description="http://www.eclipse.org/sirius/description/1.1.0" name="project" version="12.0.0.2017041100">
+  <ownedViewpoints name="MyViewpoint">
+	<validationSet name="TODO: replace this file with the result of the M2M Transformation Architecture2Sirius"/>
+    <ownedJavaExtensions qualifiedClassName="[anArchitecture.name.asSafeString()/].design.Services"/>
+  </ownedViewpoints>
+</description:Group>
+[/file]
+
+
+
+[comment]Generate Activator.java file[/comment]
+[file (anArchitecture.name.getBaseFolder()+'src/'+anArchitecture.name.asSafeString()+'/design/Activator.java', false, 'UTF-8')]
+package [anArchitecture.name.asSafeString()/].design;
+
+import java.util.HashSet;
+import java.util.Set;
+import org.eclipse.sirius.business.api.componentization.ViewpointRegistry;
+import org.eclipse.sirius.viewpoint.description.Viewpoint;
+import org.eclipse.ui.plugin.AbstractUIPlugin;
+import org.osgi.framework.BundleContext;
+
+/**
+ * The activator class controls the plug-in life cycle
+ */
+public class Activator extends AbstractUIPlugin {
+    // The plug-in ID
+    public static final String PLUGIN_ID = "[anArchitecture.name.asSafeString()/].design";
+
+    // The shared instance
+    private static Activator plugin;
+
+    private static Set<Viewpoint> viewpoints; 
+
+    /**
+     * The constructor
+     */
+    public Activator() {
+    }
+
+    /*
+     * (non-Javadoc)
+     * 
+     * @see org.eclipse.ui.plugin.AbstractUIPlugin#start(org.osgi.framework.BundleContext)
+     */
+    public void start(BundleContext context) throws Exception {
+      super.start(context);
+	  plugin = this;
+	  viewpoints = new HashSet<Viewpoint>();
+	  viewpoints.addAll(ViewpointRegistry.getInstance().registerFromPlugin(PLUGIN_ID + "/description/[anArchitecture.name.asSafeString()/].odesign")); 
+    }
+
+    /*
+     * (non-Javadoc)
+     * 
+     * @see org.eclipse.ui.plugin.AbstractUIPlugin#stop(org.osgi.framework.BundleContext)
+     */
+    public void stop(BundleContext context) throws Exception {
+	plugin = null;
+	if (viewpoints != null) {
+	    for (final Viewpoint viewpoint: viewpoints) {
+		ViewpointRegistry.getInstance().disposeFromPlugin(viewpoint);
+	    }
+	    viewpoints.clear();
+	    viewpoints = null; 
+	}
+	super.stop(context);
+    }
+
+    /**
+     * Returns the shared instance
+     * 
+     * @return the shared instance
+     */
+    public static Activator getDefault() {
+	return plugin;
+    }
+}
+[/file]
+
+[comment]Generate Services.java file[/comment]
+[file (anArchitecture.name.getBaseFolder()+'src/'+anArchitecture.name.asSafeString()+'/design/Services.java', false, 'UTF-8')]
+/**
+ * @author Francesco Bedini (bedo2991 @ GitHub)
+ * 
+ * This file has been generated automatically by Architecture2SiriusText. 
+ * 
+ * WARNING: You should not edit this file directly,
+ * if it gets generated again, your changes will be overwritten.
+ */
+
+package [anArchitecture.name.asSafeString()/].design;
+
+[if(anArchitecture.shouldMultiplicityBeChecked())]
+import java.util.concurrent.atomic.AtomicInteger;
+[/if]
+
+[comment]If there is at least one connector with distinct == true[/comment]
+[if(anArchitecture.modelelements->filter(architecture::Connector)->select(c : architecture::Connector | c.distinct)->size()>0)]
+import java.util.stream.Collectors;
+[/if]
+import de.e4sm.tuilmenau.sse.architectureimpl.model.architectureImpl.ConnectableElement;
+import de.e4sm.tuilmenau.sse.architectureimpl.model.architectureImpl.Edge;
+import de.e4sm.tuilmenau.sse.architectureimpl.model.architectureImpl.Root;
+
+/**
+ * The services class used by VSM.
+ */
+public class Services {
+    
+    /**
+    * See http://help.eclipse.org/neon/index.jsp?topic=%2Forg.eclipse.sirius.doc%2Fdoc%2Findex.html&cp=24 for documentation on how to write service methods.
+    */
+
+[comment]For each edge[/comment]
+    [for (edge : architecture::Edge | anArchitecture.modelelements->filter(architecture::Edge))]
+     /**
+	 * 
+	 * @param container the Root of the model
+	 * @param source the element that will be the future source of the connector
+	 * @param target the element that will be the future target of the connector
+	 * @return true if the new connection is allowed, false otherwise
+	 */
+	public Boolean canConnect[edge.name.asClassName()/](Root container, ConnectableElement source, ConnectableElement target) {
+	    [isDebugEnabled()/]System.out.println("canConnect[edge.name.asClassName()/]? ================================");
+        [if (not edge.canConnectToSelf)]
+			//if canConnectToSelf is false, check if the source and the target are the same element and prohibit that.
+			if(source.equals(target)) {
+				[isDebugEnabled()/]System.out.println("Connection to self was disabled");
+				return false;
+			}
+	    [/if]
+
+		
+		Boolean result = false;
+        
+		// Check that the types are compatible
+		[comment]All items who have outgoing of type <edge>[/comment]
+        [for (i : architecture::Item |anArchitecture.modelelements->filter(architecture::Item)->select(i : architecture::Item | i.outgoing->select(c : architecture::Connection | c.connector = edge or c.connector = edge.isA)->size()>0))]
+		if (!result && source instanceof [anArchitecture.name.asClassName()/].[i.name.asClassName()/]) {
+			[isDebugEnabled()/]System.out.println("Source is a [anArchitecture.name.asClassName()/].[i.name.asClassName()/]");
+			if ([for(t : architecture::Item | i.outgoing->select(c : architecture::Connection | c.connector = edge or c.connector = edge.isA)->first().allowedTargets) separator (' || ')]target instanceof [anArchitecture.name.asClassName()/].[t.name.asClassName()/][/for])
+			{
+			    [isDebugEnabled()/]System.out.println("Target is OK");
+				result = true;
+			}
+		}
+
+		[/for]
+
+		if (!result) {
+			[isDebugEnabled()/]System.out.println("Incompatible type");
+			return false;
+		}
+
+		[if (edge.distinct)]
+		// If the connector has distinct set to true, check that there are no other
+		// connectors with the same source and target
+		if (container.getModelelements().stream().filter(me -> {
+			if (me instanceof Edge) {
+				Edge e = (Edge) me;
+				ConnectableElement s = e.getSource();
+				ConnectableElement t = e.getTarget();
+				if(s == null) {
+					System.err.println("Error: one edge does not have the source set.");
+					return false;
+				}
+				if(t == null) {
+					System.err.println("Error: one edge does not have the target set.");
+					return false;
+				}
+				if (s.equals(source) && t.equals(target)) {
+					return true;
+				}
+			}
+			return false;
+		}).collect(Collectors.toList()).size() > 0) {
+			//If there is another edge existing between this source and target, don't allow creating a new edge
+			[isDebugEnabled()/]System.out.println("Another Edge is already connecting this source and target");
+			return false;
+		}
+		[/if]
+		
+       [if(anArchitecture.shouldMultiplicityBeChecked())]
+		// If the maximum multiplicity is not -1, check maximum multiplicity for the source and target
+		AtomicInteger sourceCount = new AtomicInteger(0);
+		AtomicInteger targetCount = new AtomicInteger(0);
+
+		container.getModelelements().forEach(me -> {
+			if (me instanceof Edge) {
+				Edge e = (Edge) me;
+				ConnectableElement s = e.getSource();
+				ConnectableElement t = e.getTarget();
+				if(s == null) {
+					System.err.println("Error: one edge does not have the source set.");
+					return;
+				}
+				if(t == null) {
+					System.err.println("Error: one edge does not have the target set.");
+					return;
+				}
+				if (s.equals(source)) {
+					sourceCount.getAndIncrement();
+				}
+				if (t.equals(target)) {
+					targetCount.getAndIncrement();
+				}
+			}
+		});
+		[isDebugEnabled()/]System.out.println("Source: " + sourceCount.get());
+		[isDebugEnabled()/]System.out.println("Target: " + targetCount.get());
+		
+		//Outgoing constraints which are less than *
+		[comment]All items who have outgoing of type <edge>[/comment]
+        [for (i : architecture::Item |anArchitecture.modelelements->filter(architecture::Item)->select(i : architecture::Item | i.outgoing->select(c : architecture::Connection | c.connector = edge or c.connector = edge.isA and c.max > -1)->size()>0))]
+		if (source instanceof [anArchitecture.name.asClassName()/].[i.name.asClassName()/]) {
+			if(sourceCount.get() >= [i.outgoing->select(c : architecture::Connection | c.connector = edge or c.connector = edge.isA)->first().max/]) {
+				[isDebugEnabled()/]System.out.println("Outgoing multiplicity overflow");
+				return false;
+			}
+		}
+
+		[/for]		
+		
+		//Incoming constraints which are less than *
+        [for (i : architecture::Item |anArchitecture.modelelements->filter(architecture::Item)->select(i : architecture::Item | i.incoming->select(c : architecture::Connection | c.connector = edge or c.connector = edge.isA and c.max > -1)->size()>0))]
+		if (target instanceof [anArchitecture.name.asClassName()/].[i.name.asClassName()/]) {
+			if(targetCount.get() >= [i.incoming->select(c : architecture::Connection | c.connector = edge or c.connector = edge.isA)->first().max/]) {
+				[isDebugEnabled()/]System.out.println("Incoming multiplicity overflow");
+				return false;
+			}
+		}
+
+		[/for]
+		[/if]
+
+		//Otherwise, allow the connection
+		[isDebugEnabled()/]System.out.println("Yes");
+		return true;
+	}
+   [/for]
+}
+[/file]
+
+[comment]Generate the Manifest file[/comment]
+[file (anArchitecture.name.getBaseFolder()+'META-INF/MANIFEST.MF', false, 'UTF-8')]
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: %pluginName
+Bundle-SymbolicName: [anArchitecture.name.asSafeString()/].design;singleton:=true
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: [anArchitecture.name.asSafeString()/].design.Activator
+Bundle-Localization: plugin
+Require-Bundle: org.eclipse.ui,
+ org.eclipse.core.runtime,
+ org.eclipse.core.resources,
+ org.eclipse.sirius,
+ org.eclipse.sirius.common.acceleo.aql,
+ [anArchitecture.name.asSafeString()/]Ecore
+Bundle-ActivationPolicy: lazy
+Bundle-RequiredExecutionEnvironment: JavaSE-11
+Bundle-Vendor: %providerName
+Automatic-Module-Name: [anArchitecture.name.asSafeString()/].design
+[/file]
+
+[comment]Generate the .project file[/comment]
+[file (anArchitecture.name.getBaseFolder()+'.project', false, 'UTF-8')]
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+  <name>[anArchitecture.name.asSafeString()/].design</name>
+  <comment></comment>
+  <projects></projects>
+  <buildSpec>
+    <buildCommand>
+      <name>org.eclipse.jdt.core.javabuilder</name>
+      <arguments></arguments>
+    </buildCommand>
+    <buildCommand>
+      <name>org.eclipse.pde.ManifestBuilder</name>
+      <arguments></arguments>
+    </buildCommand>
+    <buildCommand>
+      <name>org.eclipse.pde.SchemaBuilder</name>
+      <arguments></arguments>
+    </buildCommand>
+  </buildSpec>
+  <natures>
+    <nature>org.eclipse.pde.PluginNature</nature>
+    <nature>org.eclipse.jdt.core.javanature</nature>
+  </natures>
+</projectDescription>
+[/file]
+
+[comment]Generate the build.properties file[/comment]
+[file (anArchitecture.name.getBaseFolder()+'build.properties', false, 'UTF-8')]
+source.. = src/
+output.. = bin/
+bin.includes = META-INF/,\
+               .,\
+               description/,\
+               plugin.properties,\
+               plugin.xml,\
+               icons/
+[/file]
+
+[comment]Generate the plugin.properties file[/comment]
+[file (anArchitecture.name.getBaseFolder()+'plugin.properties', false, 'UTF-8')]
+pluginName = [anArchitecture.name.asSafeString()/].design
+providerName = Eclipse Modeling Project
+viewpointName = MyViewpoint
+[/file]
+
+[comment]Generate the plugin.xml file[/comment]
+[file (anArchitecture.name.getBaseFolder()+'plugin.xml', false, 'UTF-8')]
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.0"?>
+<plugin>
+  <extension point="org.eclipse.sirius.componentization">
+    <component class="architecture.design.Activator"
+               id="[anArchitecture.name.asSafeString()/].design"
+	       name="[anArchitecture.name.asSafeString()/]">
+    </component>
+  </extension>
+</plugin>
+[/file]
+[/template]

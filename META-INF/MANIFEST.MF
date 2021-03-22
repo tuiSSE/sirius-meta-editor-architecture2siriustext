@@ -1,0 +1,25 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Acceleo Architecture2sirius Module Runtime Plug-in
+Bundle-SymbolicName: de.e4sm.acceleo.architecture2sirius
+Bundle-Version: 1.0.0.qualifier
+Bundle-Activator: de.e4sm.acceleo.architecture2sirius.Activator
+Bundle-Vendor: Eclipse Modeling Project
+Require-Bundle: org.eclipse.core.runtime,
+ org.eclipse.emf.ecore,
+ org.eclipse.emf.ecore.xmi,
+ org.eclipse.ocl,
+ org.eclipse.ocl.ecore,
+ org.eclipse.acceleo.common;bundle-version="3.3.0",
+ org.eclipse.acceleo.model;bundle-version="3.3.0",
+ org.eclipse.acceleo.profiler;bundle-version="3.3.0",
+ org.eclipse.acceleo.engine;bundle-version="3.3.0",
+ com.google.guava,
+ org.eclipse.acceleo.parser;bundle-version="3.7.10",
+ de.e4sm.tuilmenau.sse.architecture.model;bundle-version="1.0.0"
+Bundle-ActivationPolicy: lazy
+Eclipse-LazyStart: true
+Export-Package: de.e4sm.acceleo.architecture2sirius.main
+Automatic-Module-Name: de.e4sm.acceleo.architecture2sirius
+Bundle-Classpath: bin/
+Bundle-RequiredExecutionEnvironment: JavaSE-11
